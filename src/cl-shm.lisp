@@ -3,7 +3,8 @@
 (in-package :cl-shm)
 
 (export '(shmat shmdt attach-shared-memory-pointer detach-shared-memory-pointer shared-memory-pointer->stream))
-;; shmat and shmdt sufficient for now
+;; shmat and shmdt sufficient for now.
+;; Exposing shmctl and shmget probably needs some grovelling of system-dependent headers
 (cffi:defcfun "shmat" :pointer
   (shmid :int)
   (shmaddr :pointer)
@@ -11,15 +12,17 @@
 
 (cffi:defcfun "shmdt" :int
   (shmaddr :pointer))
+
 (let ((error-pointer (cffi:make-pointer (1- (ash 1 64)))))
   (defun attach-shared-memory-pointer (shared-memory-id &key (flags 0))
+    "Attaches the shared memory segment identified by shared-memory-id to the current lisp process and returns a pointer to it."
     (let ((result (shmat shared-memory-id (cffi:null-pointer) flags)))
-      (if (cffi:pointer-eq result error-pointer
-                           )
+      (if (cffi:pointer-eq result error-pointer)
           (error "shmat returned (void*) -1: ~a" result)
           result))))
 
 (defun detach-shared-memory-pointer (shared-memory-id)
+  "Detaches the shared memory segment that shared-memory-id points to. Returns T in case of success, otherwise NIL."
   (zerop (shmdt shared-memory-id)))
 
 (defun shared-memory-array (pointer &optional (length 100))
@@ -27,6 +30,8 @@
           (loop for i from 0 below length collecting
                 (cffi:mem-ref pointer :uint8 i))
           'vector))
+
+; Custom stream class to allow treating shared memory as a stream.
 
 (deftype octet () '(unsigned-byte 8))
 (defclass foreign-memory-input-stream (trivial-gray-streams:fundamental-binary-input-stream)
@@ -42,5 +47,5 @@
       (incf position))))
 
 (defun shared-memory-pointer->stream (shared-memory-pointer)
-  (make-instance 'foreign-memory-input-stream
-                 :pointer shared-memory-pointer))
+  "Returns a stream that reads foreign memory starting from shared-memory-pointer."
+  (make-instance 'foreign-memory-input-stream :pointer shared-memory-pointer))
