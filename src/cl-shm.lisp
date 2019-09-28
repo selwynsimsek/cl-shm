@@ -1,8 +1,15 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;; Partial implementation of System V shared memory API in Common Lisp
+
 (defpackage cl-shm
   (:use :cl))
 (in-package :cl-shm)
 
-(export '(shmat shmdt attach-shared-memory-pointer detach-shared-memory-pointer shared-memory-pointer->stream))
+(export '(shmat shmdt attach-shared-memory-pointer detach-shared-memory-pointer
+          shared-memory-pointer->stream))
+
+;;; Expose shared memory system calls to CFFI
+
 ;; shmat and shmdt sufficient for now.
 ;; Exposing shmctl and shmget probably needs some grovelling of system-dependent headers
 (cffi:defcfun "shmat" :pointer
@@ -12,6 +19,8 @@
 
 (cffi:defcfun "shmdt" :int
   (shmaddr :pointer))
+
+;;; Higher level API for shared memory
 
 (let ((error-pointer (cffi:make-pointer (1- (ash 1 64)))))
   (defun attach-shared-memory-pointer (shared-memory-id &key (flags 0))
@@ -31,7 +40,7 @@
                 (cffi:mem-ref pointer :uint8 i))
           'vector))
 
-; Custom stream class to allow treating shared memory as a stream.
+;;; Custom stream class to allow treating shared memory as a stream.
 
 (deftype octet () '(unsigned-byte 8))
 (defclass foreign-memory-input-stream (trivial-gray-streams:fundamental-binary-input-stream)
@@ -45,6 +54,8 @@
   (with-slots (pointer position) stream
     (prog1 (cffi:mem-ref pointer :uint8 position)
       (incf position))))
+
+;;; Convenience method for accessing shared memory as a stream
 
 (defun shared-memory-pointer->stream (shared-memory-pointer)
   "Returns a stream that reads foreign memory starting from shared-memory-pointer."
