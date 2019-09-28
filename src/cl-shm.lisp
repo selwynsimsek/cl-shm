@@ -9,7 +9,6 @@
           shared-memory-pointer->stream))
 
 ;;; Expose shared memory system calls to CFFI
-
 ;; shmat and shmdt sufficient for now.
 ;; Exposing shmctl and shmget probably needs some grovelling of system-dependent headers
 (cffi:defcfun "shmat" :pointer
@@ -24,14 +23,16 @@
 
 (let ((error-pointer (cffi:make-pointer (1- (ash 1 64)))))
   (defun attach-shared-memory-pointer (shared-memory-id &key (flags 0))
-    "Attaches the shared memory segment identified by shared-memory-id to the current lisp process and returns a pointer to it."
+    "Attaches the shared memory segment identified by shared-memory-id to \
+the current lisp process and returns a pointer to it."
     (let ((result (shmat shared-memory-id (cffi:null-pointer) flags)))
       (if (cffi:pointer-eq result error-pointer)
           (error "shmat returned (void*) -1: ~a" result)
           result))))
 
 (defun detach-shared-memory-pointer (shared-memory-id)
-  "Detaches the shared memory segment that shared-memory-id points to. Returns T in case of success, otherwise NIL."
+  "Detaches the shared memory segment that shared-memory-id points to.\
+Returns T in case of success, otherwise NIL."
   (zerop (shmdt shared-memory-id)))
 
 (defun shared-memory-array (pointer &optional (length 100))
